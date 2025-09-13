@@ -1,0 +1,18 @@
+version: "3"
+
+tasks:
+  default:
+    cmds:
+      # - go build -ldflags "-H windowsgui" -o bin/gotray.exe
+      - go build -o bin/gotray.exe
+      - bin/gotray.exe
+  
+  publish:
+    cmds:
+      - go build -ldflags "-s -w -H windowsgui" -o bin/gotray.exe
+      - upx bin/gotray.exe
+
+  icon:
+    cmds:
+      - go install github.com/akavel/rsrc@latest
+      - rsrc -ico icon/vscode.ico -o gotray.syso
