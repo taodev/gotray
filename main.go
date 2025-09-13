@@ -2,7 +2,6 @@ package main
 
 import (
 	_ "embed"
-	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -23,6 +22,7 @@ var (
 	dirPath      string
 	configPath   string
 	globalConfig Config
+	menuConfig   MenuConfig
 )
 
 //go:embed icon/vscode.ico
@@ -31,19 +31,25 @@ var vscodeIcon []byte
 func main() {
 	exePath, _ = os.Executable()
 	dirPath = filepath.Dir(exePath)
-	configPath = filepath.Join(dirPath, "config.yaml")
-
-	flag.StringVar(&configPath, "config", configPath, "config path")
-	flag.Parse()
-
 	f, err := os.OpenFile(filepath.Join(dirPath, "app.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 	slog.SetDefault(slog.New(slog.NewTextHandler(f, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: slog.LevelDebug,
 	})))
+
+	configPath = filepath.Join(dirPath, "config.yaml")
+	if err := config.LoadYAML(configPath, &globalConfig); err != nil {
+		globalConfig.Path = "./menu.yaml"
+		if err := config.SaveYAML(configPath, &globalConfig); err != nil {
+			slog.Error("save config failed", "err", err)
+			Alert("保存配置失败", fmt.Sprintf("path: %s, err: %s", configPath, err.Error()), 0)
+			return
+		}
+	}
+
 	systray.Run(onReady, onExit)
 }
 
@@ -103,13 +109,19 @@ func initSystemMenu() {
 }
 
 func initMenu() {
-	if err := config.LoadYAML(configPath, &globalConfig); err != nil {
-		slog.Error("load config failed", "err", err)
-		Alert("加载配置失败", err.Error(), 0)
-		return
+	menuPath := globalConfig.Path
+	if !filepath.IsAbs(menuPath) {
+		menuPath = filepath.Join(dirPath, menuPath)
+	}
+	if err := config.LoadYAML(menuPath, &menuConfig); err != nil {
+		if err := config.SaveYAML(menuPath, &menuConfig); err != nil {
+			slog.Error("save config failed", "path", menuPath, "err", err)
+			Alert("保存菜单失败", fmt.Sprintf("path: %s, err: %s", menuPath, err.Error()), 0)
+			return
+		}
 	}
 
-	for _, item := range globalConfig.Menu {
+	for _, item := range menuConfig.Menu {
 		addMenu(nil, &item)
 	}
 }
@@ -131,14 +143,15 @@ func addMenu(parent *systray.MenuItem, item *MenuItem) {
 		menu.Click(func() {
 			if item.Cmd != nil {
 				cmd := item.Cmd
-				dir := ""
-				if cmdItem, ok := globalConfig.Cmds[item.Cmd[0]]; ok {
+				// dir := ""
+				if cmdItem, ok := menuConfig.Cmds[item.Cmd[0]]; ok {
 					// 合并 []string
 					cmd = append(cmdItem.Cmd, item.Cmd[1:]...)
-					dir = cmdItem.Dir
+					// dir = cmdItem.Dir
 				}
+				slog.Info("run cmd", "cmd", cmd)
 				app := exec.Command(cmd[0], cmd[1:]...)
-				app.Dir = dir
+				// app.Dir = dir
 				app.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 				if err := app.Start(); err != nil {
 					slog.Error("start cmd failed", "cmd", item.Cmd, "err", err)
@@ -160,7 +173,8 @@ func enableAutoStart() {
 	}
 	defer k.Close()
 
-	err = k.SetStringValue(appName, fmt.Sprintf(`"%s" --config "%s"`, exePath, configPath))
+	err = k.SetStringValue(appName, fmt.Sprintf(`"%s"`, exePath))
+
 	if err != nil {
 		slog.Error("set value error", "err", err)
 		Alert("开机启动设置失败", err.Error(), 0)

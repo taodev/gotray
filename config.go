@@ -12,7 +12,11 @@ type MenuItem struct {
 	Items []MenuItem `yaml:"items"`
 }
 
-type Config struct {
+type MenuConfig struct {
 	Cmds map[string]CmdItem `yaml:"cmds"`
 	Menu []MenuItem         `yaml:"menu"`
+}
+
+type Config struct {
+	Path string `yaml:"path"`
 }
