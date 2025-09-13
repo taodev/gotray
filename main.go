@@ -51,6 +51,9 @@ func onReady() {
 	systray.SetIcon(vscodeIcon)
 	systray.SetTitle("gotray")
 	systray.SetTooltip("gotray")
+	systray.SetOnClick(func(menu systray.IMenu) {
+		menu.ShowMenu()
+	})
 	systray.SetOnRClick(func(menu systray.IMenu) {
 		menu.ShowMenu()
 	})
@@ -136,6 +139,7 @@ func addMenu(parent *systray.MenuItem, item *MenuItem) {
 				}
 				app := exec.Command(cmd[0], cmd[1:]...)
 				app.Dir = dir
+				app.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 				if err := app.Start(); err != nil {
 					slog.Error("start cmd failed", "cmd", item.Cmd, "err", err)
 					Alert("启动失败", err.Error(), 0)
