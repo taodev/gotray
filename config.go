@@ -1,5 +1,10 @@
 package main
 
+type CmdItem struct {
+	Dir string   `yaml:"dir"`
+	Cmd []string `yaml:"cmd"`
+}
+
 type MenuItem struct {
 	Title string     `yaml:"name"`
 	Icon  string     `yaml:"icon"`
@@ -8,5 +13,6 @@ type MenuItem struct {
 }
 
 type Config struct {
-	Menu []MenuItem `yaml:"menu"`
+	Cmds map[string]CmdItem `yaml:"cmds"`
+	Menu []MenuItem         `yaml:"menu"`
 }

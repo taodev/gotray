@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	appName    = "gotray"
-	exePath    string
-	dirPath    string
-	configPath string
+	appName      = "gotray"
+	exePath      string
+	dirPath      string
+	configPath   string
+	globalConfig Config
 )
 
 //go:embed icon/vscode.ico
@@ -99,14 +100,13 @@ func initSystemMenu() {
 }
 
 func initMenu() {
-	var cfg Config
-	if err := config.LoadYAML(configPath, &cfg); err != nil {
+	if err := config.LoadYAML(configPath, &globalConfig); err != nil {
 		slog.Error("load config failed", "err", err)
 		Alert("加载配置失败", err.Error(), 0)
 		return
 	}
 
-	for _, item := range cfg.Menu {
+	for _, item := range globalConfig.Menu {
 		addMenu(nil, &item)
 	}
 }
@@ -127,8 +127,16 @@ func addMenu(parent *systray.MenuItem, item *MenuItem) {
 	} else {
 		menu.Click(func() {
 			if item.Cmd != nil {
-				cmd := exec.Command(item.Cmd[0], item.Cmd[1:]...)
-				if err := cmd.Start(); err != nil {
+				cmd := item.Cmd
+				dir := ""
+				if cmdItem, ok := globalConfig.Cmds[item.Cmd[0]]; ok {
+					// 合并 []string
+					cmd = append(cmdItem.Cmd, item.Cmd[1:]...)
+					dir = cmdItem.Dir
+				}
+				app := exec.Command(cmd[0], cmd[1:]...)
+				app.Dir = dir
+				if err := app.Start(); err != nil {
 					slog.Error("start cmd failed", "cmd", item.Cmd, "err", err)
 					Alert("启动失败", err.Error(), 0)
 				}
