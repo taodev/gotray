@@ -2,6 +2,7 @@ package main
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -114,9 +115,15 @@ func initMenu() {
 		menuPath = filepath.Join(dirPath, menuPath)
 	}
 	if err := config.LoadYAML(menuPath, &menuConfig); err != nil {
-		if err := config.SaveYAML(menuPath, &menuConfig); err != nil {
-			slog.Error("save config failed", "path", menuPath, "err", err)
-			Alert("保存菜单失败", fmt.Sprintf("path: %s, err: %s", menuPath, err.Error()), 0)
+		if errors.Is(err, os.ErrNotExist) {
+			if err = config.SaveYAML(menuPath, &menuConfig); err != nil {
+				slog.Error("save config failed", "path", menuPath, "err", err)
+				Alert("保存菜单失败", fmt.Sprintf("path: %s, err: %s", menuPath, err.Error()), 0)
+				return
+			}
+		} else {
+			slog.Error("load config failed", "path", menuPath, "err", err)
+			Alert("加载菜单失败", fmt.Sprintf("path: %s, err: %s", menuPath, err.Error()), 0)
 			return
 		}
 	}
@@ -152,7 +159,7 @@ func addMenu(parent *systray.MenuItem, item *MenuItem) {
 				slog.Info("run cmd", "cmd", cmd)
 				app := exec.Command(cmd[0], cmd[1:]...)
 				// app.Dir = dir
-				app.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+				// app.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 				if err := app.Start(); err != nil {
 					slog.Error("start cmd failed", "cmd", item.Cmd, "err", err)
 					Alert("启动失败", err.Error(), 0)
